@@ -1,7 +1,7 @@
 # CryptomatorAccessDemo
 Windows demo program for de-crypting files inside Cryptomator vaults
 
-#Introduction
+# Introduction
 This demo application is provided to illustrate how C# can be used to decrypt Crytomator-encrypted vaults.
 
 It provides only one-at-a-time single-file decryption, although a Windows-form front-end is provided which will render a tree-view of the vault to make file selection simple.  Encryption of plaintext files is not supported, and access to Cryptomator vaults is read-only.  No modifications are made either to the Cryptomator files nor the vault file structure.
