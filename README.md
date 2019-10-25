@@ -22,7 +22,7 @@ The project uses several NuGet packages, all of which are MIT-licensed or are pu
 ...and a variety of Microsoft .Net packages that are dependencies because the Miscreant library targets .Net Standard  1.3
 
 # Supported Vault Formats
-This program supports only version 6 vaults (Cryptomator 1.4.x).
+This program supports version 6 and version 7 vaults (Cryptomator 1.4.x and 1.5.x).
 
 
 # License

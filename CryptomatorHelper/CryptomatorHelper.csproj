@@ -116,6 +116,9 @@
   <ItemGroup>
     <Compile Include="Aes128CounterMode.cs" />
     <Compile Include="Base32Encoding.cs" />
+    <Compile Include="Base64UrlEncoding.cs" />
+    <Compile Include="V6CryptomatorHelper.cs" />
+    <Compile Include="V7CryptomatorHelper.cs" />
     <Compile Include="CryptomatorHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

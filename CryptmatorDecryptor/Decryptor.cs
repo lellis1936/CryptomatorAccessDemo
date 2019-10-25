@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO;
-using CryptomatorDecryptor;
+using CryptomatorTools.Helpers;
 
 #pragma warning disable IDE1006,IDE0017
 
@@ -18,9 +18,13 @@ namespace CryptomatorDecryptor
     {
         public string Vault { get; set; }
         public string Password { get; set; }
-        public CrytomatorHelper cryptomatorHelper { get; set; }
+        public CryptomatorHelper cryptomatorHelper { get; set; }
         public bool VaultIsOpen { get; set; }
         public string OutputFolder { get; set; }
+
+        TreeNode clickedNode;
+        MenuItem nodeMenuItem = new MenuItem("Decrypt");
+        ContextMenu mnu = new ContextMenu();
 
         class NodeTag
         {
@@ -32,13 +36,13 @@ namespace CryptomatorDecryptor
         {
             InitializeComponent();
             StartPosition = FormStartPosition.CenterScreen;
+            mnu.MenuItems.Add(nodeMenuItem);
+            nodeMenuItem.Click += new EventHandler(nodeMenuItem_Click);
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             bool bHandled = false;
-            // switch case is the easy way, a hash or map would be better, 
-            // but more work to get set up.
             switch (keyData)
             {
                 case Keys.F5:
@@ -50,9 +54,13 @@ namespace CryptomatorDecryptor
             return bHandled;
         }
 
+        private void treeView_BeforeExpand(object sender, TreeViewCancelEventArgs e)
+        {
+                PopulateNodeCollection(e.Node.Nodes, ((NodeTag)e.Node.Tag).FilePath);
+        }
+
         private void treeView_AfterSelect(object sender, TreeViewEventArgs e)
         {
-            PopulateNode(treeView.SelectedNode.Nodes, ((NodeTag)treeView.SelectedNode.Tag).FilePath);
             if (((NodeTag)treeView.SelectedNode.Tag).IsDirectory)
                 btnDecrypt.Enabled = false;
             else
@@ -100,7 +108,6 @@ namespace CryptomatorDecryptor
             cryptomatorHelper = null;
             VaultIsOpen = false;
             treeView.Nodes.Clear();
-            toolStripStatusLabel1.Text = "No vault open.";
             btnDecrypt.Enabled = false;
             refreshTreeF5ToolStripMenuItem.Enabled = false;
         }
@@ -111,8 +118,9 @@ namespace CryptomatorDecryptor
             refreshTreeF5ToolStripMenuItem.Enabled = false;
             btnDecrypt.Enabled = false;
             lblOutputFolder.Text = "";
-            toolStripStatusLabel2.Text = "";
-            toolStripStatusLabel1.Text = "No vault open.";
+            toolStripStatusLabel1.Text = "";
+
+            treeView.Sorted = true;
         }
 
         private void UnlockVault(string vault, string password)
@@ -120,11 +128,13 @@ namespace CryptomatorDecryptor
             try
             {
                 treeView.Nodes.Clear();
-                cryptomatorHelper = new CrytomatorHelper(Password, Vault);
+                cryptomatorHelper = CryptomatorHelper.Create(Password, Vault);
                 VaultIsOpen = true;
-                toolStripStatusLabel1.Text = "Vault: " + Vault;
-                PopulateNode(treeView.Nodes, "");
+                treeView.Nodes.Add(Vault);
+                treeView.Nodes[0].Tag = new NodeTag { IsDirectory = true, FilePath = "" };
+                PopulateNodeCollection(treeView.Nodes[0].Nodes, "");
                 treeView.Focus();
+                treeView.Nodes[0].Expand();
                 refreshTreeF5ToolStripMenuItem.Enabled = true;
             }
             catch (Exception ex)
@@ -134,22 +144,26 @@ namespace CryptomatorDecryptor
 
         }
 
-        private void PopulateNode(TreeNodeCollection nodeCollection, string dirPath)
+        private void PopulateNodeCollection(TreeNodeCollection nodeCollection, string dirPath)
         {
-            if (nodeCollection.Count > 0)
-                return;             //don't do anything if this level already populated. 
 
             try
             {
                 Cursor.Current = Cursors.WaitCursor;
                 nodeCollection.Clear();
-                List<string> dirs = cryptomatorHelper.GetDirs(dirPath);
+
+                List<FolderInfo> dirs = cryptomatorHelper.GetFolders(dirPath);
                 List<string> files = cryptomatorHelper.GetFiles(dirPath);
-                foreach (string dir in dirs)
+                foreach (FolderInfo dir in dirs)
                 {
-                    TreeNode node = new TreeNode(Path.GetFileName(dir));
-                    node.Tag = new NodeTag { FilePath = dir, IsDirectory = true };
+                    bool hasChildren = dir.HasChildren;
+                    TreeNode node = new TreeNode(Path.GetFileName(dir.VirtualPath));
+                    if (hasChildren)
+                        node.Nodes.Add("...");  //placeholder
+
+                    node.Tag = new NodeTag { FilePath = dir.VirtualPath, IsDirectory = true };
                     nodeCollection.Add(node);
+
                 }
                 foreach (string file in files)
                 {
@@ -172,6 +186,18 @@ namespace CryptomatorDecryptor
 
         private void btnDecrypt_Click(object sender, EventArgs e)
         {
+            try
+            {
+                DecryptFileAtNode(treeView.SelectedNode);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Decryption failure");
+            }
+        }
+
+        private void DecryptFileAtNode(TreeNode node)
+        {
             if (OutputFolder == null)
             {
                 MessageBox.Show("You must choose an output destination (Options menu) first", "No destination set", MessageBoxButtons.OK, MessageBoxIcon.Hand);
@@ -182,7 +208,7 @@ namespace CryptomatorDecryptor
             {
                 Cursor.Current = Cursors.WaitCursor;
 
-                NodeTag tag = (NodeTag)treeView.SelectedNode.Tag;
+                NodeTag tag = (NodeTag)node.Tag;
                 string filename = Path.GetFileName(tag.FilePath);
                 string outputPath = Path.Combine(OutputFolder, filename);
 
@@ -193,18 +219,18 @@ namespace CryptomatorDecryptor
                         return;
                 }
 
-                toolStripStatusLabel2.Text = "Decrypting: " + filename + ". Please wait...";
+                toolStripStatusLabel1.Text = "Decrypting: " + filename + ". Please wait...";
                 statusStrip1.Update();
 
                 cryptomatorHelper.DecryptFile(tag.FilePath, outputPath);
 
-                toolStripStatusLabel2.Text = "\"" + filename + "\"" + " decrypted successfully.";
+                toolStripStatusLabel1.Text = "\"" + filename + "\"" + " decrypted successfully.";
                 statusStrip1.Update();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
 
-                throw;
+                throw new Exception(ex.Message, ex);
             }
             finally
             {
@@ -217,7 +243,7 @@ namespace CryptomatorDecryptor
         private void RefreshTree()
         {
             treeView.Nodes.Clear();
-            PopulateNode(treeView.Nodes, "");
+            PopulateNodeCollection(treeView.Nodes, "");
             btnDecrypt.Enabled = false;
         }
 
@@ -232,7 +258,7 @@ namespace CryptomatorDecryptor
 
             folderBrowserDialog2.ShowNewFolderButton = true;
 
-           DialogResult result = folderBrowserDialog2.ShowDialog(); // Show the dialog.
+            DialogResult result = folderBrowserDialog2.ShowDialog(); // Show the dialog.
             if (result == DialogResult.OK) // Test result.
             {
                 OutputFolder = folderBrowserDialog2.SelectedPath;
@@ -275,6 +301,31 @@ namespace CryptomatorDecryptor
 
         }
 
+        void nodeMenuItem_Click(object sender, EventArgs e)
+        {
+
+            try
+            {
+                DecryptFileAtNode(clickedNode);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Decryption failure");
+            }
+        }
+
+        private void treeView_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                clickedNode = e.Node;
+                treeView.SelectedNode = clickedNode;
+                if (((NodeTag)e.Node.Tag).IsDirectory)
+                    return;
+                mnu.Show(treeView, e.Location);
+            }
+        }
+
         private void licenseToolStripMenuItem_Click(object sender, EventArgs e)
         {
             MessageBox.Show(
@@ -283,5 +334,6 @@ namespace CryptomatorDecryptor
                 "License"
                 );
         }
+
     }
 }
