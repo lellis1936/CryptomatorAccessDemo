@@ -23,7 +23,8 @@ namespace CryptomatorDecryptor
         public string OutputFolder { get; set; }
 
         TreeNode clickedNode;
-        MenuItem nodeMenuItem = new MenuItem("Decrypt");
+        MenuItem nodeMenuItemDecrypt = new MenuItem("Decrypt");
+        MenuItem nodeMenuItemExploreEncryptedFilePath = new MenuItem("Explore encrypted file");
         ContextMenu mnu = new ContextMenu();
 
         class NodeTag
@@ -36,8 +37,10 @@ namespace CryptomatorDecryptor
         {
             InitializeComponent();
             StartPosition = FormStartPosition.CenterScreen;
-            mnu.MenuItems.Add(nodeMenuItem);
-            nodeMenuItem.Click += new EventHandler(nodeMenuItem_Click);
+            mnu.MenuItems.Add(nodeMenuItemDecrypt);
+            mnu.MenuItems.Add(nodeMenuItemExploreEncryptedFilePath);
+            nodeMenuItemDecrypt.Click += new EventHandler(nodeMenuItemDecrypt_Click);
+            nodeMenuItemExploreEncryptedFilePath.Click += new EventHandler(nodeMenuItemExploreEncryptedFile_Click);
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -240,6 +243,37 @@ namespace CryptomatorDecryptor
             }
         }
 
+        private void ExplorerAtEncryptedFile(TreeNode node)
+        {
+            try
+            {
+                NodeTag tag = (NodeTag)node.Tag;
+                string filename = Path.GetFileName(tag.FilePath);
+                string path = cryptomatorHelper.GetEncryptedFilePath(tag.FilePath);
+                ExploreFile(path);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message, ex);
+            }
+            finally
+            {
+                treeView.Focus();
+            }
+        }
+
+        public bool ExploreFile(string filePath)
+        {
+            if (!System.IO.File.Exists(filePath))
+            {
+                return false;
+            }
+            //Clean up file path so it can be navigated OK
+            filePath = System.IO.Path.GetFullPath(filePath);
+            System.Diagnostics.Process.Start("explorer.exe", string.Format("/select,\"{0}\"", filePath));
+            return true;
+        }
+
         private void RefreshTree()
         {
             treeView.Nodes.Clear();
@@ -301,7 +335,7 @@ namespace CryptomatorDecryptor
 
         }
 
-        void nodeMenuItem_Click(object sender, EventArgs e)
+        void nodeMenuItemDecrypt_Click(object sender, EventArgs e)
         {
 
             try
@@ -313,6 +347,20 @@ namespace CryptomatorDecryptor
                 MessageBox.Show(ex.Message, "Decryption failure");
             }
         }
+
+        private void nodeMenuItemExploreEncryptedFile_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                ExplorerAtEncryptedFile(clickedNode);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "ShowPath failure");
+            }
+        }
+
+
 
         private void treeView_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
         {

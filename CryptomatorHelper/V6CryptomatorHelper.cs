@@ -333,8 +333,8 @@ public class V6CryptomatorHelper:CryptomatorHelper
         return lines[0];
 
     }
+ 
 
-   
     public override void DecryptFile(string virtualPath, string outFile)
     {
         using (FileStream outputStream = new FileStream(outFile, FileMode.Create))
@@ -368,6 +368,14 @@ public class V6CryptomatorHelper:CryptomatorHelper
             Console.WriteLine("Decryption complete.  Time: {0} ms", sw.ElapsedMilliseconds);
         }
 
+    }
+
+    public override string GetEncryptedFilePath(string virtualPath)
+    {
+        string encryptedFilePath = GetFilePhysicalPath(virtualPath);
+        if (String.IsNullOrEmpty(encryptedFilePath))
+            throw new ArgumentException("Unable to locate encrypted file");
+        return encryptedFilePath;
     }
 
     private string[] GetDirHierarchy(string virtualPath)

@@ -27,3 +27,7 @@ This program supports version 6 and version 7 vaults (Cryptomator 1.4.x and 1.5.
 
 # License
 This demo application and related source code are licensed under GPLv3 unless otherwise noted.
+
+
+# Change History
+**9/11/2020** - Added **Explore Encrypted File** right-click context menu option.  This will open a Windows file explorer at the *encrypted* file location.  This can facilitate restoring previous versions of the encrypted file in some cases (for example, when the vault is stored on **Microsoft OneDrive**).  Restore previous versions with caution and at your own risk.

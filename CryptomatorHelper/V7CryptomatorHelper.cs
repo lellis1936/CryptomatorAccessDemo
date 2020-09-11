@@ -400,6 +400,13 @@ public class V7CryptomatorHelper:CryptomatorHelper
         }
 
     }
+    public override string GetEncryptedFilePath(string virtualPath)
+    {
+        string encryptedFilePath = GetFilePhysicalPath(virtualPath);
+        if (String.IsNullOrEmpty(encryptedFilePath))
+            throw new ArgumentException("Unable to locate encrypted file");
+        return encryptedFilePath;
+    }
 
     private string[] GetDirHierarchy(string virtualPath)
     {

@@ -35,6 +35,7 @@ namespace CryptomatorTools.Helpers
         public abstract List<FolderInfo> GetFolders(string virtualPath);
         public abstract void DecryptFile(string virtualPath, string outFile);
         public abstract void DecryptFile(string virtualPath, Stream outputStream);
+        public abstract string GetEncryptedFilePath(string virtualPath);
 
         public static CryptomatorHelper Create(string password, string vaultPath)
         {
