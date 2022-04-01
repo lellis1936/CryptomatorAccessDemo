@@ -1,9 +1,4 @@
-﻿//TODO Version 7 long filename handling.  DONE, but needs major refactoring.  Also need to check long directory names in v6
-//TODO In version 6, sync up file handling with this code.
-// Handle long directory names
-// Review Exception handling
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,27 +14,12 @@ using CryptSharp.Utility;
 using CryptomatorTools.Helpers;
 
 
-public class V7CryptomatorHelper:CryptomatorHelper
+public class V7CryptomatorHelper : CryptomatorHelper
 {
     readonly string vaultPath;
-    readonly byte[] kek;
-    readonly byte[] masterKey;
-    readonly byte[] macKey;
-    readonly byte[] sivKey;
     readonly Aead siv;
     readonly string pathSeparator = Path.DirectorySeparatorChar.ToString();
     readonly string physicalPathRoot;
-
-    private class MasterKey
-    {
-        public string ScryptSalt { get; set; }
-        public int ScryptCostParam { get; set; }
-        public int ScryptBlockSize { get; set; }
-        public string PrimaryMasterKey { get; set; }
-        public string HmacMasterKey { get; set; }
-        public string VersionMac { get; set; }
-        public int Version { get; set; }
-    }
 
     private class DirInfo
     {
@@ -51,47 +31,20 @@ public class V7CryptomatorHelper:CryptomatorHelper
     }
 
     private SHA1CryptoServiceProvider sha1 = new SHA1CryptoServiceProvider();
+    Keys keys;
 
-    public V7CryptomatorHelper(string password, string vaultPath)
+    public V7CryptomatorHelper(Keys keys, string vaultPath)
     {
-        try
-        {
-            string masterKeyPath = PathJoin(vaultPath, "masterkey.cryptomator");
+        this.keys = keys;
 
-            var jsonString = File.ReadAllText(masterKeyPath);
-            MasterKey mkey = JsonConvert.DeserializeObject<MasterKey>(jsonString);
+        this.vaultPath = vaultPath;
+        siv = Aead.CreateAesCmacSiv(keys.sivKey);
 
-            if (mkey.Version != 7)
-                throw new ArgumentException("Only version 7 vaults are supported");
+        byte[] ciphertext = siv.Seal(new byte[0]);
+        byte[] hash = sha1.ComputeHash(ciphertext);
+        string fullDirName = Base32Encoding.ToString(hash);
+        physicalPathRoot = PathJoin(fullDirName.Substring(0, 2), fullDirName.Substring(2));
 
-            byte[] abPrimaryMasterKey = Convert.FromBase64String(mkey.PrimaryMasterKey);
-            byte[] abHmacMasterKey = Convert.FromBase64String(mkey.HmacMasterKey);
-            byte[] abScryptSalt = Convert.FromBase64String(mkey.ScryptSalt);
-
-            kek = SCrypt.ComputeDerivedKey(Encoding.ASCII.GetBytes(password), abScryptSalt, mkey.ScryptCostParam, mkey.ScryptBlockSize, 1, 1, 32);
-
-            masterKey = KeyWrapAlgorithm.UnwrapKey(kek, abPrimaryMasterKey);
-            macKey = KeyWrapAlgorithm.UnwrapKey(kek, abHmacMasterKey);
-            sivKey = macKey.Concat(masterKey).ToArray();
-
-            this.vaultPath = vaultPath;
-            siv = Aead.CreateAesCmacSiv(sivKey);
-
-            byte[] ciphertext = siv.Seal(new byte[0]);
-            byte[] hash = sha1.ComputeHash(ciphertext);
-            string fullDirName = Base32Encoding.ToString(hash);
-            physicalPathRoot = PathJoin(fullDirName.Substring(0, 2), fullDirName.Substring(2));
-
-        }
-        catch (System.IO.FileNotFoundException e)
-        {
-            throw new FileNotFoundException("Cannot open master key file (masterkey.cryptomator)", e);
-        }
-
-        catch (CryptographicException e)
-        {
-            throw new CryptographicException("Cannot open vault, possible password error", e);
-        }
     }
 
     public override List<string> GetFiles(string virtualPath = "")
@@ -269,7 +222,7 @@ public class V7CryptomatorHelper:CryptomatorHelper
             foreach (FileSystemInfo fsi in fsis)
             {
                 string encryptedFilename = fsi.Name;
-                if(IsVirtualDirectory(fsi))
+                if (IsVirtualDirectory(fsi))
                 {
                     //It's a directory...
                     if (dir.Level < virtualDirHierarchy.Length)
@@ -442,16 +395,16 @@ public class V7CryptomatorHelper:CryptomatorHelper
             ciphertextPayload = reader.ReadBytes(40);
             mac = reader.ReadBytes(32);
 
-            HMAC headerHmac = new HMAC(macKey);
+            HMAC headerHmac = new HMAC(keys.macKey);
             headerHmac.Update(headerNonce);
             headerHmac.DoFinal(ciphertextPayload);
             if (!headerHmac.Hash.SequenceEqual(mac))
                 throw new IOException("Encrypted file fails integrity check.");
 
-            cleartextPayload = AesCtr(ciphertextPayload, masterKey, headerNonce);
+            cleartextPayload = AesCtr(ciphertextPayload, keys.masterKey, headerNonce);
             contentKey = Slice(cleartextPayload, 8, 32);
 
-            HMAC chunkHmac = new HMAC(macKey);
+            HMAC chunkHmac = new HMAC(keys.macKey);
 
             //Process all chunks
             for (int blocknum = 0; ; ++blocknum)

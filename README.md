@@ -22,7 +22,7 @@ The project uses several NuGet packages, all of which are MIT-licensed or are pu
 ...and a variety of Microsoft .Net packages that are dependencies because the Miscreant library targets .Net Standard  1.3
 
 # Supported Vault Formats
-This program supports version 6 and version 7 vaults (Cryptomator 1.4.x and 1.5.x).
+This program supports version 6-8 vaults (Cryptomator 1.4.x - 1.6.x).
 
 
 # License
@@ -30,4 +30,7 @@ This demo application and related source code are licensed under GPLv3 unless ot
 
 
 # Change History
+
+**4/1/2022** - Added support for version 8 vaults. 
+
 **9/11/2020** - Added **Explore Encrypted File** right-click context menu option.  This will open a Windows file explorer at the *encrypted* file location.  This can facilitate restoring previous versions of the encrypted file in some cases (for example, when the vault is stored on **Microsoft OneDrive**).  Restore previous versions with caution and at your own risk.

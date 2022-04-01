@@ -1,4 +1,15 @@
-﻿using System;
+﻿
+/*
+ * Beginning work on version 8 format. References:
+ * 
+ * https://jwt.io/  (can decode new vault.caytomator file)
+ * https://community.cryptomator.org/t/with-cryptomator-2-0-for-ios-beta-is-the-vault-version-8/8161
+ * https://community.cryptomator.org/t/vault-format-8/8573
+ * 
+ */
+
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
