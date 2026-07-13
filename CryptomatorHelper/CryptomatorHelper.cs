@@ -102,7 +102,7 @@ namespace CryptomatorTools.Helpers
             byte[] abHmacMasterKey = Convert.FromBase64String(mkey.HmacMasterKey);
             byte[] abScryptSalt = Convert.FromBase64String(mkey.ScryptSalt);
 
-            kek = SCrypt.ComputeDerivedKey(Encoding.ASCII.GetBytes(password), abScryptSalt, mkey.ScryptCostParam, mkey.ScryptBlockSize, 1, 1, 32);
+            kek = SCrypt.ComputeDerivedKey(Encoding.UTF8.GetBytes(password), abScryptSalt, mkey.ScryptCostParam, mkey.ScryptBlockSize, 1, 1, 32);
 
             Keys keys = new Keys();
             keys.masterKey = KeyWrapAlgorithm.UnwrapKey(kek, abPrimaryMasterKey);
