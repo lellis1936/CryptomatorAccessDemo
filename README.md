@@ -22,7 +22,9 @@ The project uses several NuGet packages, all of which are MIT-licensed or are pu
 ...and a variety of Microsoft .Net packages that are dependencies because the Miscreant library targets .Net Standard  1.3
 
 # Supported Vault Formats
-This program supports version 6-8 vaults (Cryptomator 1.4.x - 1.6.x).
+This program supports version 6-8 vaults, including vaults maintained by current Cryptomator releases (which add a `dirid.c9r` recovery file to each folder).
+
+Note: format 8 vaults using the `SIV_GCM` cipher combo (the default for vaults *newly created* by Cryptomator 1.6 and later) are not supported.  Vaults upgraded from earlier formats retain the supported `SIV_CTRMAC` cipher combo.
 
 
 # License
@@ -30,6 +32,8 @@ This demo application and related source code are licensed under GPLv3 unless ot
 
 
 # Change History
+
+**7/13/2026** (v1.3) - Fixed vault passwords containing non-ASCII characters (now encoded as UTF-8, matching the Cryptomator reference implementation).  Fixed a crash when browsing vaults maintained by Cryptomator 1.6.9+, which write a `dirid.c9r` recovery file into every folder; unrecognized or undecryptable entries (e.g. sync conflict copies) are now skipped instead of aborting the listing.  Updated NuGet dependencies to address security advisories.
 
 **4/1/2022** - Added support for version 8 vaults. 
 
