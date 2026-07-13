@@ -21,6 +21,9 @@ public class V7CryptomatorHelper : CryptomatorHelper
     readonly string pathSeparator = Path.DirectorySeparatorChar.ToString();
     readonly string physicalPathRoot;
 
+    // Recovery file written by Cryptomator 1.6.9+ inside every content directory; not an encrypted name.
+    private const string DirIdBackupFileName = "dirid.c9r";
+
     private class DirInfo
     {
         public string Name { get; set; }
@@ -65,12 +68,17 @@ public class V7CryptomatorHelper : CryptomatorHelper
             foreach (FileSystemInfo fsi in fsis)
             {
                 string encryptedFilename = fsi.Name;
+                if (encryptedFilename == DirIdBackupFileName)
+                    continue;
+
                 if (IsVirtualDirectory(fsi))
                 {
                     //It's a directory...
                     if (dir.Level < virtualDirHierarchy.Length)
                     {
-                        DirInfo newDir = CreateDirInfo(fsi.FullName, encryptedFilename, dir);
+                        DirInfo newDir = TryCreateDirInfo(fsi.FullName, encryptedFilename, dir);
+                        if (newDir == null)
+                            continue;
                         if (newDir.Name.ToLower() == virtualDirHierarchy[dir.Level].ToLower())
                         {
                             stack.Push(newDir);
@@ -80,11 +88,12 @@ public class V7CryptomatorHelper : CryptomatorHelper
                 }
                 else
                 {
-                    //It's a file...  
+                    //It's a file...
                     if (dir.Level == virtualDirHierarchy.Length)
                     {
-                        string Base64EncryptedName = encryptedFilename;
-                        var filename = DecryptFileName(fsi.FullName, dir.ParentDirId);
+                        var filename = TryDecryptFileName(fsi.FullName, dir.ParentDirId);
+                        if (filename == null)
+                            continue;
                         fileList.Add(PathJoin(dir.VirtualPath, filename));
                     }
                 }
@@ -114,7 +123,9 @@ public class V7CryptomatorHelper : CryptomatorHelper
                 {
                     if (dir.Level < virtualDirHierarchy.Length)
                     {
-                        DirInfo newDir = CreateDirInfo(d, encryptedFilename, dir);
+                        DirInfo newDir = TryCreateDirInfo(d, encryptedFilename, dir);
+                        if (newDir == null)
+                            continue;
                         if (newDir.Name.ToLower() == virtualDirHierarchy[dir.Level].ToLower())
                         {
                             stack.Push(newDir);
@@ -123,7 +134,9 @@ public class V7CryptomatorHelper : CryptomatorHelper
                     }
                     else if (dir.Level == virtualDirHierarchy.Length)
                     {
-                        DirInfo newDirInfo = CreateDirInfo(d, encryptedFilename, dir);
+                        DirInfo newDirInfo = TryCreateDirInfo(d, encryptedFilename, dir);
+                        if (newDirInfo == null)
+                            continue;
                         dirList.Add(PathJoin(dir.VirtualPath, newDirInfo.Name));
                     }
                 }
@@ -153,7 +166,9 @@ public class V7CryptomatorHelper : CryptomatorHelper
                 {
                     if (dir.Level < virtualDirHierarchy.Length)
                     {
-                        DirInfo newDir = CreateDirInfo(d, encryptedFilename, dir);
+                        DirInfo newDir = TryCreateDirInfo(d, encryptedFilename, dir);
+                        if (newDir == null)
+                            continue;
                         if (newDir.Name.ToLower() == virtualDirHierarchy[dir.Level].ToLower())
                         {
                             stack.Push(newDir);
@@ -162,7 +177,9 @@ public class V7CryptomatorHelper : CryptomatorHelper
                     }
                     else if (dir.Level == virtualDirHierarchy.Length)
                     {
-                        DirInfo newDirInfo = CreateDirInfo(d, encryptedFilename, dir);
+                        DirInfo newDirInfo = TryCreateDirInfo(d, encryptedFilename, dir);
+                        if (newDirInfo == null)
+                            continue;
                         folderList.Add(
                             new FolderInfo
                             {
@@ -222,12 +239,17 @@ public class V7CryptomatorHelper : CryptomatorHelper
             foreach (FileSystemInfo fsi in fsis)
             {
                 string encryptedFilename = fsi.Name;
+                if (encryptedFilename == DirIdBackupFileName)
+                    continue;
+
                 if (IsVirtualDirectory(fsi))
                 {
                     //It's a directory...
                     if (dir.Level < virtualDirHierarchy.Length)
                     {
-                        DirInfo newDir = CreateDirInfo(fsi.FullName, encryptedFilename, dir);
+                        DirInfo newDir = TryCreateDirInfo(fsi.FullName, encryptedFilename, dir);
+                        if (newDir == null)
+                            continue;
                         if (newDir.Name.ToLower() == virtualDirHierarchy[dir.Level].ToLower())
                         {
                             stack.Push(newDir);
@@ -240,8 +262,9 @@ public class V7CryptomatorHelper : CryptomatorHelper
                     //It's a file...  is the right one?
                     if (dir.Level == virtualDirHierarchy.Length)
                     {
-                        string Base64EncryptedName = encryptedFilename;
-                        var filename = DecryptFileName(fsi.FullName, dir.ParentDirId);
+                        var filename = TryDecryptFileName(fsi.FullName, dir.ParentDirId);
+                        if (filename == null)
+                            continue;
                         if (filename.ToLower() == searchFilename.ToLower())
                         {
                             if (fsi.FullName.EndsWith(".c9s"))
@@ -308,6 +331,35 @@ public class V7CryptomatorHelper : CryptomatorHelper
         byte[] plaintextName = siv.Open(encryptedName, null, Encoding.UTF8.GetBytes(parentDirId));
         return Encoding.UTF8.GetString(plaintextName);
 
+    }
+
+    // Tolerant variants: return null for entries that can't be decrypted or read
+    // (sync-conflict copies, foreign files, future format additions) so traversal
+    // can skip them instead of aborting. Failures in traversal logic itself still throw.
+    private string TryDecryptFileName(string fullFileName, string parentDirId)
+    {
+        try
+        {
+            return DecryptFileName(fullFileName, parentDirId);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Skipping entry '{fullFileName}': {ex.Message}");
+            return null;
+        }
+    }
+
+    private DirInfo TryCreateDirInfo(string physicalDirFile, string base64Ciphertext, DirInfo parent)
+    {
+        try
+        {
+            return CreateDirInfo(physicalDirFile, base64Ciphertext, parent);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Skipping directory entry '{physicalDirFile}': {ex.Message}");
+            return null;
+        }
     }
 
     private string GetEncryptedLongFilename(string fullFileName)
